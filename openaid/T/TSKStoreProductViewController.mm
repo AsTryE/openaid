@@ -1,25 +1,12 @@
 //
-//  AppDelegate.m
+//  TSKStoreProductViewControllerViewController.m
 //  openaid
 //
-//  Created by tangxianhai on 2017/8/15.
+//  Created by tangxianhai on 2017/8/21.
 //  Copyright © 2017年 tangxianhai. All rights reserved.
 //
 
-
-#ifdef __cplusplus
-#import <opencv2/opencv.hpp>
-#import <opencv2/imgproc/types_c.h>
-#import <opencv2/imgcodecs/ios.h>
-#endif
-#import "AppDelegate.h"
-#import "MBProgressHUD.h"
-#import "WJPhotoTool.h"
-#import "UIImage+T.h"
-#import "T.h"
-#import "UIView+Toast.h"
-#import "ZwImagesQueueDownloader.h"
-#import <Photos/Photos.h>
+#import "TSKStoreProductViewController.h"
 
 enum AppState : NSUInteger {
     AppStateUpdate,
@@ -29,20 +16,25 @@ enum AppState : NSUInteger {
     AppStateError,
 };
 
-@interface AppDelegate () <PHPhotoLibraryChangeObserver>
+@interface TSKStoreProductViewController ()<PHPhotoLibraryChangeObserver>
 @property (nonatomic) BOOL isTakeScreenshot;
 @property (nonatomic) AppState appState;
 @property (nonatomic) BOOL isAppIcon;
 @property (nonatomic,strong) NSArray<UIImage*> * tmpMatImage;
 @end
 
-@implementation AppDelegate {
+@implementation TSKStoreProductViewController {
+    UIWindow *topWindow;
     cv::Point currentLoc;
     cv::Mat inputMat;
 }
 
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-    
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    [self prepareSomething];
+}
+
+- (void)prepareSomething {
     //注册通知
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(userDidTakeScreenshot:)
@@ -50,103 +42,44 @@ enum AppState : NSUInteger {
     //相册变化通知
     [[PHPhotoLibrary sharedPhotoLibrary] registerChangeObserver:self];
     
-    return YES;
-}
-
-- (void)taskMethod {
-//    NSLog(@"taskMethod Start executing %@, mainThread: %@, currentThread: %@", NSStringFromSelector(_cmd), [NSThread mainThread], [NSThread currentThread]);
-    NSLog(@"Finish executing %@", NSStringFromSelector(_cmd));
+    topWindow = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+    topWindow.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.01];
+    topWindow.windowLevel = UIWindowLevelAlert;
+    topWindow.hidden = NO;
 }
 
 - (void)startCCCCCCC {
-        // 初始化应用状态
-        self.appState = AppStateError;
-        self.isAppIcon = YES;
+    // 初始化应用状态
+    self.appState = AppStateError;
+    self.isAppIcon = YES;
     
-    NSOperationQueue *operationQueue = [[NSOperationQueue alloc] init];
+    [self appstoreGetStateQ];
+    [self appstoreOpenStateQ];
+    [self appstoreUpdateStateQ];
     
-    NSBlockOperation *blockOperation1 = [NSBlockOperation blockOperationWithBlock:^{
-        NSLog(@"并行任务1");
-        [self appstoreGetStateQ];
-    }];
-    
-//    NSBlockOperation *blockOperation2 = [NSBlockOperation blockOperationWithBlock:^{
-//        NSLog(@"并行任务2");
-//        [self appstoreIconStateQ];
-//    }];
-    
-    NSBlockOperation *blockOperation3 = [NSBlockOperation blockOperationWithBlock:^{
-        NSLog(@"并行任务3");
-        [self appstoreOpenStateQ];
-    }];
-    
-    NSBlockOperation *blockOperation4 = [NSBlockOperation blockOperationWithBlock:^{
-        NSLog(@"并行任务4");
-        [self appstoreUpdateStateQ];
-    }];
-    
-    [operationQueue addOperations:@[blockOperation1,blockOperation3,blockOperation4] waitUntilFinished:YES];
-    
-    [operationQueue addOperationWithBlock:^{
-        NSLog(@"全部任务执行完毕！\\\\\n");
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [MBProgressHUD hideHUDForView:self.window animated:YES];
-            if (self.isAppIcon) {
-                // 应用是指定的下载应用
-                if (self.appState == AppStateGet) {
-                    // 当前为获取状态
-                    [self.window makeToast:@"当前为获取状态！" duration:2 position:CSToastPositionTop];
-                } else if (self.appState == AppStateUpdate) {
-                    // 当前为更新状态
-                    [self.window makeToast:@"当前为更新状态" duration:2 position:CSToastPositionTop];
-                } else if (self.appState == AppStateOpen) {
-                    // 当前为打开状态，即下载完成
-                    [self.window makeToast:@"当前为打开状态，即下载完成" duration:2 position:CSToastPositionTop];
-                } else {
-                    // 异常状态
-                    [self.window makeToast:@"请在指定的任务界面截图！" duration:2 position:CSToastPositionTop];
-                }
-            } else {
-                [self.window makeToast:@"您下载的应用不是指定应用！" duration:2 position:CSToastPositionTop];
-            }
-            [self deletePhotoLastPicture];
-        });
-        
-    }];
-    
-}
-
-/// 检测AppStore 应用图标是否正确
-- (void)appstoreIconStateQ {
-    // 获取应用图标
-    @synchronized(self) {
-        // 扫描应用图标是否正确
-        NSString *filePathAppIcon = [[ZwImagesQueueDownloader shareInstance] imageFileFullPathWithFileName:APP_ICON];
-        UIImage *appIconImage = [UIImage imageWithContentsOfFile:filePathAppIcon];
-        appIconImage = [self imageCompressWithSimple:appIconImage scale:2];
-        NSArray *appIconArry = [self compareByLevel:8 CameraInput:inputMat templateMat:[self initTemplateImage:appIconImage]];
-        NSLog(@"appIconArry: %@",appIconArry);
-        if ([appIconArry count] > 0) {
-            self.isAppIcon = YES;
+    [MBProgressHUD hideHUDForView:topWindow animated:YES];
+    if (self.isAppIcon) {
+        // 应用是指定的下载应用
+        if (self.appState == AppStateGet) {
+            // 当前为获取状态
+            [topWindow makeToast:@"当前为获取状态！" duration:2 position:CSToastPositionTop];
+        } else if (self.appState == AppStateUpdate) {
+            // 当前为更新状态
+            [topWindow makeToast:@"当前为更新状态" duration:2 position:CSToastPositionTop];
+        } else if (self.appState == AppStateOpen) {
+            // 当前为打开状态，即下载完成
+            [topWindow makeToast:@"当前为打开状态，即下载完成" duration:2 position:CSToastPositionTop];
         } else {
-            self.isAppIcon = NO;
+            // 异常状态
+            [topWindow makeToast:@"请在指定的任务界面截图！" duration:2 position:CSToastPositionTop];
         }
+    } else {
+        [topWindow makeToast:@"您下载的应用不是指定应用！" duration:2 position:CSToastPositionTop];
     }
-}
-
-- (UIImage*)imageCompressWithSimple:(UIImage*)image scale:(float)scale
-{
-    CGSize size = image.size;
-    CGFloat width = size.width;
-    CGFloat height = size.height;
-    CGFloat scaledWidth = width * scale;
-    CGFloat scaledHeight = height * scale;
-    size = CGSizeMake(scaledWidth, scaledHeight);
-    UIGraphicsBeginImageContext(size); // this will crop
-    [image drawInRect:CGRectMake(0,0,scaledWidth,scaledHeight)];
-    UIImage* newImage= UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    return newImage;
+    if (self.finishBlock != nil) {
+        self.finishBlock(self);
+    }
+    [self deletePhotoLastPicture];
 }
 
 /// 检测AppStore 应用是否有打开按钮
@@ -206,9 +139,9 @@ enum AppState : NSUInteger {
     
     if (self.isTakeScreenshot) {
         NSLog(@"change change......");
-        __weak AppDelegate *weakSelf =  self;
+        __weak TSKStoreProductViewController *weakSelf =  self;
         dispatch_async(dispatch_get_main_queue(), ^{
-          MBProgressHUD *hud = [MBProgressHUD showHUDAddedTo:self.window animated:YES];
+            MBProgressHUD *hud = [MBProgressHUD showHUDAddedTo:topWindow animated:YES];
             [hud.backgroundView setStyle:MBProgressHUDBackgroundStyleSolidColor];
         });
         self.isTakeScreenshot = NO;
@@ -249,7 +182,7 @@ enum AppState : NSUInteger {
                         [PHAssetChangeRequest deleteAssets:@[obj]];
                     }
                 } completionHandler:^(BOOL success, NSError *error) {
-//                    NSLog(@"Error: %@", error);
+                    //                    NSLog(@"Error: %@", error);
                 }];
             }];
         }
@@ -292,10 +225,10 @@ enum AppState : NSUInteger {
     cv::minMaxLoc( resultMat, &minVal, &maxVal, &minLoc, &maxLoc, cv::Mat());
     //    matchLoc = maxLoc;
     //    NSLog(@"min==%f,max==%f",minVal,maxVal);
-//    dispatch_async(dispatch_get_main_queue(), ^{
-//        UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"提示" message:[NSString stringWithFormat:@"相似度：%.2f",maxVal] delegate:nil cancelButtonTitle:@"Ok" otherButtonTitles:nil];
-//        [alert show];
-//    });
+    //    dispatch_async(dispatch_get_main_queue(), ^{
+    //        UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"提示" message:[NSString stringWithFormat:@"相似度：%.2f",maxVal] delegate:nil cancelButtonTitle:@"Ok" otherButtonTitles:nil];
+    //        [alert show];
+    //    });
     NSLog(@"%@",[NSString stringWithFormat:@"相似度：%.2f",maxVal]);
     if (maxVal > 0.85) {
         //有相似位置，返回相似位置的第一个点
@@ -354,5 +287,12 @@ enum AppState : NSUInteger {
     return marr;
 }
 
+- (void)dealloc {
+    NSLog(@"dealloc......");
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:UIApplicationUserDidTakeScreenshotNotification object:nil];
+    [[PHPhotoLibrary sharedPhotoLibrary] unregisterChangeObserver:self];
+    topWindow.hidden = YES;
+    topWindow = nil;
+}
 
 @end

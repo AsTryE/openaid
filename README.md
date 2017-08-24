@@ -5,7 +5,8 @@
 * 建立  
 > 下载opencv2.framework导入项目中，即可运行。  
 * 使用  
-``` /// 根据appId应用内打开app
+``` 
+/// 根据appId应用内打开app
 - (void)openAppWithIdentifier:(NSString *)appId {
     // 初始化控制器
     TSKStoreProductViewController *storeProductVC = [[TSKStoreProductViewController alloc] init];
@@ -22,6 +23,5 @@
             [self presentViewController:storeProductVC animated:YES completion:nil];
         }
     }];
-}
-```  
+}  
 
